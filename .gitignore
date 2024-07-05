@@ -1,0 +1,6 @@
+build/
+.vscode/
+*.code-workspace
+.DS_Store
+send_changes.sh
+test.sh

@@ -1,0 +1,42 @@
+// window manager options
+workspace_count = 3
+workspace_layouts = [2, 5, 6] // [STACKING_MODE, N_COLUMNS_MODE, N_ROWS_MODE]
+max_clients = 5
+
+focus_follows_mouse = true
+mod1_key = XCB_MOD1_MASK_1
+mod4_key = XCB_MOD_MASK_4
+
+// styling options
+clients_gap = 15
+border_width = 2
+
+border_color = 0xb6f474
+focused_border_color = 0xe9f3de
+unfocused_border_color = 0xabcdef
+
+// margin = [0, 0, 0, 0] -> top, right, bottom, left -- not implemented yet
+margin_left = 0
+margin_top = 0
+margin_right = 0
+margin_bottom = 0
+
+min_window_width = 150
+min_window_height = 150
+
+// layout options
+// stacking mode
+stacking_mode_master_window_ratio = 0.55
+stacking_mode_master_window_position = left
+stacking_mode_master_window_orientation = vertical
+
+// n-columns mode
+n_columns_mode_number_of_columns = 2
+
+// n-rows mode
+n_rows_mode_number_of_rows = 2
+
+// rules
+client_rule = firefox,state^floating
+client_rule = xterm,width^100,height^100
+client_rule = alacritty,state^floating,x^20,y^50,border_width^5
