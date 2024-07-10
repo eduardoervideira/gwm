@@ -45,46 +45,12 @@ int establish_monocle_mode(WindowManager *gwm, Workspace *workspace){
 // TODO: fix margins (ter em conta a border_width) -> ainda não sei fazer
 int establish_stacking_mode(WindowManager *gwm, Workspace *workspace){
     int num_clients = workspace->num_clients_in_layout_clients;
-    if(num_clients == 0)
+    if(num_clients <= 0)
         return -1;
 
     int master_client_width = 0, master_client_height = 0, master_client_x_pos = 0, master_client_y_pos = 0;
     if(num_clients == 1){
         establish_master_client_fullsize(gwm, workspace);
-    } else if(num_clients == 2){
-        int slave_client_width = 0, slave_client_height = 0, slave_client_x_pos = 0, slave_client_y_pos = 0;
-        // TODO: remover código repetido daqui...
-        if(gwm->config.stacking_mode_master_window_orientation == HORIZONTAL){
-            int total_height = gwm->screen->height_in_pixels;
-            master_client_width = gwm->screen->width_in_pixels - (2 * gwm->config.clients_gap);
-            master_client_height = workspace->layout_clients[0]->properties.manual_resize ? workspace->layout_clients[0]->properties.height : total_height * gwm->config.stacking_mode_master_window_ratio;
-            slave_client_height = workspace->layout_clients[1]->properties.manual_resize ? workspace->layout_clients[1]->properties.height : total_height - master_client_height - (3 * gwm->config.clients_gap);
-            slave_client_width = gwm->screen->width_in_pixels - (2 * gwm->config.clients_gap);
-
-            master_client_x_pos = gwm->config.clients_gap;
-            master_client_y_pos = gwm->config.stacking_mode_master_window_position == TOP ? gwm->config.clients_gap : slave_client_height + (2 * gwm->config.clients_gap);
-
-            slave_client_x_pos = gwm->config.clients_gap;
-            slave_client_y_pos = gwm->config.stacking_mode_master_window_position == TOP ? master_client_height + (2 * gwm->config.clients_gap) : gwm->config.clients_gap;
-        } else {
-            int total_width = gwm->screen->width_in_pixels;
-            master_client_width = workspace->layout_clients[0]->properties.manual_resize ? workspace->layout_clients[0]->properties.width : total_width * gwm->config.stacking_mode_master_window_ratio;
-            master_client_height = gwm->screen->height_in_pixels - (2 * gwm->config.clients_gap) - (gwm->config.margin_top);
-            slave_client_height = gwm->screen->height_in_pixels - (2 * gwm->config.clients_gap) - (gwm->config.margin_top);
-            slave_client_width = workspace->layout_clients[1]->properties.manual_resize ? workspace->layout_clients[1]->properties.width : total_width - master_client_width - (3 * gwm->config.clients_gap);
-            
-            master_client_x_pos = gwm->config.stacking_mode_master_window_position == LEFT ? gwm->config.clients_gap : slave_client_width + (2 * gwm->config.clients_gap);
-            master_client_y_pos = gwm->config.margin_top + gwm->config.clients_gap;
-
-            slave_client_x_pos = gwm->config.stacking_mode_master_window_position == LEFT ? master_client_width + (2 * gwm->config.clients_gap) : gwm->config.clients_gap;
-            slave_client_y_pos = gwm->config.margin_top + gwm->config.clients_gap;
-        }
-
-        move_client(gwm, workspace->layout_clients[0], master_client_x_pos, master_client_y_pos);
-        resize_client(gwm, workspace->layout_clients[0], master_client_width, master_client_height, 0);
-        
-        move_client(gwm, workspace->layout_clients[1], slave_client_x_pos, slave_client_y_pos);
-        resize_client(gwm, workspace->layout_clients[1], slave_client_width, slave_client_height, 0);
     } else {
         int slave_client_width, slave_client_height, slave_client_x_pos, slave_client_y_pos;
         if(gwm->config.stacking_mode_master_window_orientation == HORIZONTAL){
