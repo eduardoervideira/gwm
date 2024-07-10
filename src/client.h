@@ -14,6 +14,5 @@ int toggle_floating(WindowManager *gwm, Client *client, bool is_floating);
 int set_client_border_width(WindowManager *gwm, Client *client, uint16_t border_width);
 int set_client_border_color(WindowManager *gwm, Client *client, uint32_t color);
 int apply_client_rules(WindowManager *gwm, Client *client);
-int set_above(WindowManager *gwm, Client *client);
-int set_below(WindowManager *gwm, Client *client);
+int raise_client(WindowManager *gwm, Client *client);
 #endif
