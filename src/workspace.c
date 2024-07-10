@@ -75,8 +75,8 @@ Workspace *create_workspace(WindowManager *gwm, LayoutMode layout_mode){
         return NULL;
     }
 
-    workspace->clients_stack = calloc(gwm->config.max_clients, sizeof(Client *));
-    if(!workspace->clients_stack){
+    workspace->layout_clients = calloc(gwm->config.max_clients, sizeof(Client *));
+    if(!workspace->layout_clients){
         log_message(LOG_FATAL, "failed to allocate memory for clients stack");
         return NULL;
     }
@@ -102,13 +102,13 @@ void realloc_workspace(WindowManager *gwm, Workspace *workspace){
     log_message(LOG_DEBUG, "workspace available slots after update: %d", workspace->available_slots);
 
     // realoc new clients stack
-    Client **new_clients_stack = (Client **)realloc(workspace->clients_stack, (workspace->num_clients + gwm->config.max_clients) * sizeof(Client *));
-    if(new_clients_stack == NULL){
+    Client **new_layout_clients = (Client **)realloc(workspace->layout_clients, (workspace->num_clients + gwm->config.max_clients) * sizeof(Client *));
+    if(new_layout_clients == NULL){
         log_message(LOG_FATAL, "failed to reallocate memory for clients stack");
         return;
     }
 
-    workspace->clients_stack = new_clients_stack;
+    workspace->layout_clients = new_layout_clients;
 }
 
 int add_client_to_workspace(WindowManager *gwm, Workspace *workspace, Client *client){
@@ -118,6 +118,14 @@ int add_client_to_workspace(WindowManager *gwm, Workspace *workspace, Client *cl
     if(workspace->available_slots == 0){
         log_message(LOG_INFO, "max number of clients reached, reallocating...");
         realloc_workspace(gwm, workspace);
+    }
+
+    if(workspace->layout_mode == FLOATING_MODE){
+        client->properties.width = client->properties.floating_width = gwm->screen->width_in_pixels / 2;
+        client->properties.height = client->properties.floating_height =  gwm->screen->height_in_pixels / 2;
+        client->properties.x_pos = client->properties.floating_x_pos = (gwm->screen->width_in_pixels - client->properties.width) / 2;
+        client->properties.y_pos = client->properties.floating_y_pos = (gwm->screen->height_in_pixels - client->properties.height) / 2;
+        client->properties.is_floating = true;
     }
 
     workspace->clients[workspace->num_clients] = *client;
@@ -141,6 +149,21 @@ int add_client_to_workspace(WindowManager *gwm, Workspace *workspace, Client *cl
     gwm->error = xcb_request_check(gwm->connection, gwm->cookie);
     if(gwm->error){
         log_message(LOG_ERROR, "failed to change window attributes. error code: %d", gwm->error->error_code);
+        free(gwm->error);
+    }
+
+    uint32_t button_mask = XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_BUTTON_MOTION;
+    gwm->cookie = xcb_grab_button_checked(gwm->connection, 0, client->window, button_mask, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC, gwm->screen->root, XCB_NONE, 1, XCB_MOD_MASK_1);
+    gwm->error = xcb_request_check(gwm->connection, gwm->cookie);
+    if(gwm->error){
+        log_message(LOG_ERROR, "failed to grab button. error code: %d", gwm->error->error_code);
+        free(gwm->error);
+    }
+    
+    gwm->cookie = xcb_grab_button_checked(gwm->connection, 0, client->window, button_mask, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC, gwm->screen->root, XCB_NONE, 3, XCB_MOD_MASK_1);
+    gwm->error = xcb_request_check(gwm->connection, gwm->cookie);
+    if(gwm->error){
+        log_message(LOG_ERROR, "failed to grab button. error code: %d", gwm->error->error_code);
         free(gwm->error);
     }
 
@@ -177,6 +200,7 @@ int add_client_to_workspace(WindowManager *gwm, Workspace *workspace, Client *cl
     free(keycode_left);
     free(keycode_right);
     free(keycode_space);
+
     return 0;
 }
 
@@ -202,7 +226,7 @@ void remove_client_from_workspace(Workspace *workspace, Client *client){
     }
 
     workspace->num_clients--;
-    workspace->num_clients_in_clients_stack--;
+    workspace->num_clients_in_layout_clients--;
     workspace->available_slots++;
     workspace->last_focused_client_id = workspace->focused_client_id;
     workspace->focused_client_id = workspace->num_clients - 1;
