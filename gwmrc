@@ -25,10 +25,16 @@ min_window_width = 150
 min_window_height = 150
 
 // layout options
+// orientation: 0 = horizontal
+// position: 0 = left, 1 = right, 2 = up, 3 = down
+
+// orientation: 1 = vertical
+// position: 0 = up, 1 = down, 2 = left, 3 = right
+
 // stacking mode
-stacking_mode_master_window_ratio = 0.55
-stacking_mode_master_window_position = left
-stacking_mode_master_window_orientation = vertical
+stacking_mode_master_window_ratio = 0.5
+stacking_mode_master_window_orientation = 0
+stacking_mode_master_window_position = 0
 
 // n-columns mode
 n_columns_mode_number_of_columns = 2
