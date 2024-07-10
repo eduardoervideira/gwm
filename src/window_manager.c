@@ -150,14 +150,13 @@ WindowManager *setup(){
     free(keycode_l);
     free(keycode_tab);
 
-    // Grab the mouse buttons
-    xcb_grab_button(gwm->connection, 0, gwm->screen->root, XCB_EVENT_MASK_BUTTON_PRESS |
+    /*xcb_grab_button(gwm->connection, 0, gwm->screen->root, XCB_EVENT_MASK_BUTTON_PRESS |
         XCB_EVENT_MASK_BUTTON_RELEASE, XCB_GRAB_MODE_ASYNC,
         XCB_GRAB_MODE_ASYNC, gwm->screen->root, XCB_NONE, 1, XCB_MOD_MASK_1); // XCB_NONE to allow mouse events without Mod1 pressed
 
     xcb_grab_button(gwm->connection, 0, gwm->screen->root, XCB_EVENT_MASK_BUTTON_PRESS |
         XCB_EVENT_MASK_BUTTON_RELEASE, XCB_GRAB_MODE_ASYNC,
-        XCB_GRAB_MODE_ASYNC, gwm->screen->root, XCB_NONE, 3, XCB_MOD_MASK_1);
+        XCB_GRAB_MODE_ASYNC, gwm->screen->root, XCB_NONE, 3, XCB_MOD_MASK_1);*/
 
     xcb_flush(gwm->connection);
 
@@ -199,11 +198,11 @@ WindowManager *setup(){
 
 void cleanup(WindowManager *gwm){
     for(int i = 0; i < gwm->num_workspaces; i++){
-        for(int j = 0; j < gwm->workspaces[i].num_clients_in_clients_stack; j++){
-            free(gwm->workspaces[i].clients_stack[j]);
+        for(int j = 0; j < gwm->workspaces[i].num_clients_in_layout_clients; j++){
+            free(gwm->workspaces[i].layout_clients[j]);
         }
 
-        free(gwm->workspaces[i].clients_stack);
+        free(gwm->workspaces[i].layout_clients);
         for(int j = 0; j < gwm->workspaces[i].num_clients; j++){
             xcb_unmap_window(gwm->connection, gwm->workspaces[i].clients[j].window);
             xcb_destroy_window(gwm->connection, gwm->workspaces[i].clients[j].window);
