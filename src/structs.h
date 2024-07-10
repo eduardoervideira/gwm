@@ -97,9 +97,9 @@ typedef struct {
 
 typedef struct {
     Client *clients;
-    Client **clients_stack;
+    Client **layout_clients;
     int num_clients;
-    int num_clients_in_clients_stack;
+    int num_clients_in_layout_clients;
     int available_slots;
     int focused_client_id;
     int last_focused_client_id;
