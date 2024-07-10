@@ -29,7 +29,12 @@ int handle_configure_notify(WindowManager *gwm, xcb_generic_event_t *event){
     return 0;
 }*/
 
-// TODO: implement movement and resize of floating windows
+void adjust_dimensions(WindowManager *gwm, Client *client, uint16_t client_x_pos, uint16_t client_y_pos, uint16_t *width, uint16_t *height, uint16_t width_change, uint16_t height_change, uint16_t move_x, uint16_t move_y) {
+    *width += width_change;
+    *height += height_change;
+    move_client(gwm, client, client_x_pos + move_x, client_y_pos + move_y);
+}
+
 int handle_motion_notify(WindowManager *gwm, xcb_generic_event_t *event){
     xcb_motion_notify_event_t *motion_notify_event = (xcb_motion_notify_event_t *)event;
 
@@ -37,6 +42,81 @@ int handle_motion_notify(WindowManager *gwm, xcb_generic_event_t *event){
     if(client == NULL)
         return -1;
 
+    if(motion_notify_event->state & XCB_BUTTON_MASK_1 && client->properties.is_floating){
+        uint16_t dragdelta_x = motion_notify_event->root_x - gwm->cursor_x;
+        uint16_t dragdelta_y = motion_notify_event->root_y - gwm->cursor_y;
+        move_client(gwm, client, client->properties.x_pos + dragdelta_x, client->properties.y_pos + dragdelta_y);
+    } else if(motion_notify_event->state & XCB_BUTTON_MASK_3 && client->properties.is_floating){
+        uint16_t new_width = client->properties.width;
+        uint16_t new_height = client->properties.height;
+
+        bool top_left = (motion_notify_event->root_x >= client->properties.x_pos - 65) && 
+                        (motion_notify_event->root_x <= client->properties.x_pos + 65) && 
+                        (motion_notify_event->root_y >= client->properties.y_pos - 65) && 
+                        (motion_notify_event->root_y <= client->properties.y_pos + 65);
+
+        bool top_right = (motion_notify_event->root_x >= client->properties.x_pos + client->properties.width - 65) && 
+                        (motion_notify_event->root_x <= client->properties.x_pos + client->properties.width + 65) && 
+                        (motion_notify_event->root_y >= client->properties.y_pos - 65) && 
+                        (motion_notify_event->root_y <= client->properties.y_pos + 65);
+
+        bool bottom_right = (motion_notify_event->root_x >= client->properties.x_pos + client->properties.width - 65) && 
+                        (motion_notify_event->root_x <= client->properties.x_pos + client->properties.width + 65) && 
+                        (motion_notify_event->root_y >= client->properties.y_pos + client->properties.height - 65) && 
+                        (motion_notify_event->root_y <= client->properties.y_pos + client->properties.height + 65);
+
+        bool bottom_left = (motion_notify_event->root_x >= client->properties.x_pos - 65) && 
+                        (motion_notify_event->root_x <= client->properties.x_pos + 65) && 
+                        (motion_notify_event->root_y >= client->properties.y_pos + client->properties.height - 65) && 
+                        (motion_notify_event->root_y <= client->properties.y_pos + client->properties.height + 65);
+
+        if (top_left) {
+            if (motion_notify_event->event_x < 0 && motion_notify_event->event_y < 0) {
+                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, abs(motion_notify_event->event_x), abs(motion_notify_event->event_y), motion_notify_event->event_x, motion_notify_event->event_y);
+            } else if (motion_notify_event->event_x > 0 && motion_notify_event->event_y > 0) {
+                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, -abs(motion_notify_event->event_x), -abs(motion_notify_event->event_y), motion_notify_event->event_x, motion_notify_event->event_y);
+            }
+        } else if (top_right) {
+            if (motion_notify_event->event_x > 0 && motion_notify_event->event_y < 0) {
+                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, motion_notify_event->event_x - new_width, abs(motion_notify_event->event_y), 0, motion_notify_event->event_y);
+            } else if (motion_notify_event->event_x > 0 && motion_notify_event->event_y > 0) {
+                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, motion_notify_event->event_x - new_width, -abs(motion_notify_event->event_y), 0, motion_notify_event->event_y);
+            }
+        } else if (bottom_left) {
+            if (motion_notify_event->event_x < 0 && motion_notify_event->event_y > 0) {
+                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, abs(motion_notify_event->event_x), motion_notify_event->event_y - new_height, motion_notify_event->event_x, 0);
+            } else if (motion_notify_event->event_x > 0 && motion_notify_event->event_y > 0) {
+                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, -abs(motion_notify_event->event_x), motion_notify_event->event_y - new_height, motion_notify_event->event_x, 0);
+            }
+        } else if (bottom_right) {
+            if (motion_notify_event->event_x > 0 && motion_notify_event->event_y > 0) {
+                new_width = motion_notify_event->event_x;
+                new_height = motion_notify_event->event_y;
+            } else if (motion_notify_event->event_x < 0 && motion_notify_event->event_y > 0) {
+                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, abs(motion_notify_event->event_x), motion_notify_event->event_y - new_height, 0, 0);
+            }
+        }
+
+        if(!top_left && !top_right && !bottom_left && !bottom_right){
+             // TODO: resize growing working but shrinking is not -- it's a little bit buggy
+            if(motion_notify_event->root_y > client->properties.y_pos + client->properties.height) {
+                new_height = motion_notify_event->root_y - client->properties.y_pos;
+            } else if(motion_notify_event->event_y < 0) {
+                new_height = client->properties.height + abs(motion_notify_event->event_y);
+                move_client(gwm, client, client->properties.x_pos, client->properties.y_pos - abs(motion_notify_event->event_y));
+            } else if(motion_notify_event->event_x < 0){
+                new_width = client->properties.width + abs(motion_notify_event->event_x);
+                move_client(gwm, client, client->properties.x_pos - abs(motion_notify_event->event_x), client->properties.y_pos);
+            } else if(motion_notify_event->root_x > client->properties.x_pos + client->properties.width) {
+                new_width = motion_notify_event->root_x - client->properties.x_pos;
+            }
+        }
+
+        if (new_width < 150) new_width = 150;
+        if (new_height < 150) new_height = 150;
+
+        resize_client(gwm, client, new_width, new_height, true);
+    }
     return 0;
 }
 
@@ -60,20 +140,41 @@ int handle_enter_notify(WindowManager *gwm, xcb_generic_event_t *event){
 int handle_button_press(WindowManager *gwm, xcb_generic_event_t *event){
     xcb_button_press_event_t *button_press_event = (xcb_button_press_event_t *)event;
 
-    Client *client = get_client(gwm, button_press_event->child);
+    Client *client = get_client(gwm, button_press_event->event);
     if(client == NULL)
         return -1;
 
-    log_message(LOG_DEBUG, "handle_button_press");
-
     if(button_press_event->detail == 1){
-        log_message(LOG_DEBUG, "Button 1 pressed");
         gwm->button_pressed = true;
+        gwm->cursor_x = button_press_event->root_x;
+        gwm->cursor_y = button_press_event->root_y;
+
+        /*if(client->properties.is_floating){
+            gwm->client_x = client->properties.floating_x_pos;
+            gwm->client_y = client->properties.floating_y_pos;
+        } else {
+            gwm->client_x = client->properties.x_pos;
+            gwm->client_y = client->properties.y_pos;
+        }*/
+
         xcb_set_input_focus(gwm->connection, XCB_INPUT_FOCUS_POINTER_ROOT, client->window, XCB_CURRENT_TIME);
         xcb_ewmh_set_active_window(&gwm->ewmh, 0, client->window);
-        xcb_ewmh_set_wm_state(&gwm->ewmh, client->window, 1, &gwm->ewmh._NET_WM_STATE_ABOVE);
+        raise_client(gwm, client);
+        //xcb_configure_window(gwm->connection, client->window, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_ABOVE});
+        //xcb_ewmh_set_wm_state(&gwm->ewmh, client->window, 1, &gwm->ewmh._NET_WM_STATE_ABOVE);
     } else if(button_press_event->detail == 3){
         log_message(LOG_DEBUG, "Button 3 pressed");
+        gwm->button_pressed = true;
+        gwm->cursor_x = button_press_event->event_x;
+        gwm->cursor_y = button_press_event->event_y;
+
+        /*printf("Client X: %d, Y: %d\n", client->properties.x_pos, client->properties.y_pos);
+        printf("Client Width: %d, Height: %d\n", client->properties.width, client->properties.height);
+        printf("Cursor X: %d, Y: %d\n", button_press_event->root_x, button_press_event->root_y);
+        printf("root_x %d, root_y %d\n", button_press_event->root_x, button_press_event->root_y);
+        printf("event_x %d, event_y %d\n", button_press_event->event_x, button_press_event->event_y);
+        printf("client X %d, Y %d\n", client->properties.x_pos, client->properties.y_pos);
+        printf("client width %d, height %d\n", client->properties.width, client->properties.height);*/
     }
 
     xcb_flush(gwm->connection);
@@ -186,13 +287,14 @@ void handle_mod4_key_press(WindowManager *gwm, xcb_key_press_event_t *key_event)
     if(is_key_pressed(gwm->key_symbols, key_event->detail, XK_C)){ // kill client
         xcb_kill_client(gwm->connection, client->window); // TODO: needs to be implemented in a better way, xcb_kill_client might be too abruptly
     } else if(is_key_pressed(gwm->key_symbols, key_event->detail, XK_F)){ // toggle floating
+        log_message(LOG_DEBUG, "toggled floating");
         toggle_floating(gwm, client, !client->properties.is_floating);
         establish_layout(gwm);
     } else if(is_key_pressed(gwm->key_symbols, key_event->detail, XK_L)){ // reset client layout
         client->properties.manual_resize = false;
         establish_layout(gwm);
     } else if(is_key_pressed(gwm->key_symbols, key_event->detail, XK_space)){ // swap with master
-        // TODO: stop using clients[0], use clients_stack[0]
+        // TODO: stop using clients[0], use layout_clients[0]
         Client temp = gwm->workspaces[gwm->current_workspace_id].clients[0];
         gwm->workspaces[gwm->current_workspace_id].clients[0] = gwm->workspaces[gwm->current_workspace_id].clients[client_index];
         gwm->workspaces[gwm->current_workspace_id].clients[client_index] = temp;
@@ -239,12 +341,28 @@ int handle_map_request(WindowManager *gwm, xcb_generic_event_t *event){
     }
 
     client->window = map_request_event->window;
-
     add_client_to_workspace(gwm, &gwm->workspaces[gwm->current_workspace_id], client);
+
+    /*printf("Client window: %d\n", client->window);
+    printf("Client workspace_id: %d\n", client->workspace_id);
+    printf("Client x_pos: %d\n", client->properties.x_pos);
+    printf("Client y_pos: %d\n", client->properties.y_pos);
+    printf("Client floating_x_pos: %d\n", client->properties.floating_x_pos);
+    printf("Client floating_y_pos: %d\n", client->properties.floating_y_pos);
+    printf("Client width: %d\n", client->properties.width);
+    printf("Client height: %d\n", client->properties.height);
+    printf("Client floating_width: %d\n", client->properties.floating_width);
+    printf("Client floating_height: %d\n", client->properties.floating_height);
+    printf("Client is_floating: %d\n", client->properties.is_floating);*/
+
     //apply_client_rules(gwm, client);
     establish_layout(gwm); // TODO: check error code before
-    xcb_map_window(gwm->connection, client->window);
 
+    set_client_border_width(gwm, client, 1);
+    set_client_border_color(gwm, client, 0xb6f474);
+    
+    xcb_map_window(gwm->connection, client->window);
+    
     xcb_set_input_focus(gwm->connection, XCB_INPUT_FOCUS_POINTER_ROOT, client->window, XCB_CURRENT_TIME);
     xcb_ewmh_set_active_window(&gwm->ewmh, 0, client->window);
 
@@ -271,7 +389,6 @@ void sigint_handler(){
 
 int handle_events(WindowManager *gwm){
     xcb_generic_event_t *event;
-
     signal(SIGINT, sigint_handler);
     while(run){
         if((event = xcb_wait_for_event(gwm->connection)) != NULL){
