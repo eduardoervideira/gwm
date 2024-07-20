@@ -5,7 +5,12 @@ gwm is a window manager for X11 using XCB.
 inspired by bspwm, dwm, ragnar and many other window managers.
 
 # dependencies
-todo
+- libxcb
+- libxcb-util
+- libxcb-icccm
+- libxcb-ewmh
+- libxcb-randr
+- libxcb-keysyms
 
 # installation
 ```bash
