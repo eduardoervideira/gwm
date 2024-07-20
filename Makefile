@@ -1,6 +1,6 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -g
-LDFLAGS = -lxcb -lxcb-util -lxcb-ewmh -lxcb-randr -lxcb-keysyms -lxcb-icccm -lm
+CFLAGS = -Wall -Wextra -g $(shell pkg-config --cflags xcb xcb-util xcb-icccm xcb-ewmh xcb-randr xcb-keysyms)
+LDFLAGS = $(shell pkg-config --libs xcb xcb-util xcb-icccm xcb-ewmh xcb-randr xcb-keysyms) -lm
 
 SRCDIR = src
 BUILDDIR = build
@@ -23,7 +23,7 @@ all: $(TARGET)
 $(TARGET): $(SOURCES)
 	@mkdir -p $(BUILDDIR)
 	@echo "compiling gwm"
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGET) $(SOURCES)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(LDFLAGS)
 
 clean:
 	rm -rf $(BUILDDIR)/*
@@ -36,4 +36,4 @@ config:
 
 install: $(TARGET)
 	@cp $(TARGET) /usr/bin/gwm
-	@echo "copying gwm binary: $(TARGET) -> /usr/bin/gwm"# DO NOT DELETE
+	@echo "copying gwm binary: $(TARGET) -> /usr/bin/gwm"
