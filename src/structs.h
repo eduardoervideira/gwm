@@ -9,20 +9,23 @@
 #include <xcb/xcb_keysyms.h>
 #include <X11/keysym.h>
 
-typedef enum : uint8_t {
+#define CORNER_MARGIN 15
+#define EDGE_MARGIN 5
+
+typedef enum {
     LEFT,
     RIGHT,
     TOP,
     BOTTOM
 } Direction;
 
-typedef enum : uint8_t {
+typedef enum {
     VERTICAL,
     HORIZONTAL
 } Orientation;
 
 
-typedef enum : uint8_t {
+typedef enum {
     FLOATING_MODE,
     MONOCLE_MODE,
     STACKING_MODE, // TODO: maybe split into HORIZONTAL_STACKING_MODE and VERTICAL_STACKING_MODE
@@ -33,6 +36,8 @@ typedef enum : uint8_t {
 } LayoutMode;
 
 typedef struct {
+    char *path;
+    time_t last_change;
     uint8_t workspace_count;
     uint8_t *workspace_layouts;
     uint8_t max_clients;
@@ -66,22 +71,20 @@ typedef struct {
 
 typedef struct {
     uint32_t stack_mode;
-    uint16_t x_pos;
-    uint16_t y_pos;
+    int16_t x_pos;
+    int16_t y_pos;
     uint16_t width;
     uint16_t height;
     uint16_t border_width;
     bool manual_resize;
-    uint16_t before_resize_width;
-    uint16_t before_resize_height;
     bool is_floating;
-    uint16_t floating_x_pos;
-    uint16_t floating_y_pos;
+    int16_t floating_x_pos;
+    int16_t floating_y_pos;
     uint16_t floating_width;
     uint16_t floating_height;
     bool is_fullscreen;
-    uint16_t before_fullscreen_x_pos;
-    uint16_t before_fullscreen_y_pos;
+    int16_t before_fullscreen_x_pos;
+    int16_t before_fullscreen_y_pos;
     uint16_t before_fullscreen_width;
     uint16_t before_fullscreen_height;
     char *class_name;
@@ -113,6 +116,7 @@ typedef struct {
     xcb_screen_t *screen;
     xcb_ewmh_connection_t ewmh;
     xcb_window_t wm_window;
+    xcb_cursor_t cursor;
     xcb_void_cookie_t cookie;
     xcb_generic_error_t *error;
     xcb_key_symbols_t *key_symbols;
@@ -124,8 +128,8 @@ typedef struct {
     Rules *rules;
     int num_rules;
     bool button_pressed;
-    uint16_t cursor_x;
-    uint16_t cursor_y;
+    int16_t cursor_x;
+    int16_t cursor_y;
 } WindowManager;
 
 #endif
