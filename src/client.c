@@ -35,14 +35,11 @@ Client *create_client(){
         return NULL;
     }
 
-    client->workspace_id = -1;
-    client->properties.before_resize_height = -1;
-    client->properties.before_resize_width = -1;
-    
-    client->properties.floating_x_pos = -1;
-    client->properties.floating_y_pos = -1;
-    client->properties.floating_height = -1;    
-    client->properties.floating_width = -1;
+    client->workspace_id = -1;    
+    client->properties.floating_x_pos = 0;
+    client->properties.floating_y_pos = 0;
+    client->properties.floating_height = 0;    
+    client->properties.floating_width = 0;
 
     return client;
 }
@@ -72,7 +69,7 @@ int destroy_client(WindowManager *gwm, Client *client){
     return 0;
 }
 
-int resize_client(WindowManager *gwm, Client *client, uint16_t width, uint16_t height, bool manual_resize){
+int resize_client(WindowManager *gwm, Client *client, uint16_t width, uint16_t height){
     if(client == NULL){
         log_message(LOG_ERROR, "client is NULL\n");
         return -1;
@@ -81,12 +78,6 @@ int resize_client(WindowManager *gwm, Client *client, uint16_t width, uint16_t h
     /*if((width < gwm->config.min_window_width || height < gwm->config.min_window_height) && manual_resize){
         return -1;
     }*/
-
-    if(manual_resize){
-        client->properties.before_resize_width = client->properties.width;
-        client->properties.before_resize_height = client->properties.height;
-        client->properties.manual_resize = true;
-    }
 
     uint32_t values[2];
     values[0] = width;
@@ -101,17 +92,11 @@ int resize_client(WindowManager *gwm, Client *client, uint16_t width, uint16_t h
         client->properties.floating_height = height;
     }
 
-    /*if(width == client->properties.before_resize_width){
-        client->properties.before_resize_width = -1;
-        client->properties.before_resize_height = -1;
-        client->properties.manual_resize = false;
-    }*/
-
     xcb_flush(gwm->connection);
     return 0;
 }
 
-int move_client(WindowManager *gwm, Client *client, uint16_t x, uint16_t y){
+int move_client(WindowManager *gwm, Client *client, int16_t x, int16_t y){ // previously uint16_t
     if(client == NULL){
         log_message(LOG_ERROR, "client is NULL\n");
         return -1;
@@ -148,6 +133,25 @@ int raise_client(WindowManager *gwm, Client *client){
     return 0;
 }
 
+int set_client_focus(WindowManager *gwm, Client *client, int client_index){
+    if(client == NULL || client_index < 0 || client_index >= gwm->workspaces[gwm->current_workspace_id].num_clients){
+        log_message(LOG_ERROR, "client is NULL\n");
+        return -1;
+    }
+
+    if(gwm->workspaces[gwm->current_workspace_id].focused_client_id != -1){
+        set_client_border_color(gwm, &gwm->workspaces[gwm->current_workspace_id].clients[gwm->workspaces[gwm->current_workspace_id].focused_client_id], 0x868686); // TODO: error code 3 sometimes
+    }
+
+    gwm->workspaces[gwm->current_workspace_id].focused_client_id = client_index;
+    xcb_set_input_focus(gwm->connection, XCB_INPUT_FOCUS_POINTER_ROOT, client->window, XCB_CURRENT_TIME);
+    xcb_ewmh_set_active_window(&gwm->ewmh, 0, client->window);
+    set_client_border_color(gwm, client, 0xb6f474);
+
+    xcb_flush(gwm->connection);
+    return 0;
+}
+
 // TODO: refactor this function
 int toggle_floating(WindowManager *gwm, Client *client, bool is_floating){
     if(client == NULL){
@@ -156,20 +160,20 @@ int toggle_floating(WindowManager *gwm, Client *client, bool is_floating){
     }
 
     if(is_floating){
-        client->properties.floating_width = gwm->screen->width_in_pixels / 2;
-        client->properties.floating_height = gwm->screen->height_in_pixels / 2;
-        client->properties.floating_x_pos = (gwm->screen->width_in_pixels - client->properties.floating_width) / 2;
-        client->properties.floating_y_pos = (gwm->screen->height_in_pixels - client->properties.floating_height) / 2;
+        if(client->properties.floating_width == 0 || client->properties.floating_height == 0){
+            client->properties.floating_width = gwm->screen->width_in_pixels / 2;
+            client->properties.floating_height = gwm->screen->height_in_pixels / 2;
+            client->properties.floating_x_pos = (gwm->screen->width_in_pixels - client->properties.floating_width) / 2;
+            client->properties.floating_y_pos = (gwm->screen->height_in_pixels - client->properties.floating_height) / 2;
+        }
+        
         client->properties.is_floating = true;
+        raise_client(gwm, client);
     } else {
-        client->properties.floating_width = -1;
-        client->properties.floating_height = -1;
-        client->properties.floating_x_pos = -1;
-        client->properties.floating_y_pos = -1;
         client->properties.is_floating = false;
     }
 
-    raise_client(gwm, client);
+    
     xcb_flush(gwm->connection);
     return 0;
 }
@@ -200,6 +204,7 @@ int set_client_border_color(WindowManager *gwm, Client *client, uint32_t color){
     xcb_generic_error_t *error = xcb_request_check(gwm->connection, cookie);
     if(error){
         log_message(LOG_ERROR, "failed to change window attributes\n");
+        printf("ERROR: %d\n", error->error_code);
         free(error);
         return -1;
     }
