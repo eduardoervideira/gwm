@@ -4,3 +4,7 @@ build/
 .DS_Store
 send_changes.sh
 test.sh
+env.sh
+vgcore*
+TODO.md
+gwm.log
