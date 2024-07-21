@@ -29,7 +29,7 @@ int establish_master_client_fullsize(WindowManager *gwm, Workspace *workspace){
     // ideia: no unmap_notify passar uma flag para o establish_layout
     
     move_client(gwm, master_client, master_client_x_pos, master_client_y_pos);
-    resize_client(gwm, master_client, master_client_width, master_client_height, 0);
+    resize_client(gwm, master_client, master_client_width, master_client_height);
     
     return 0;
 }
@@ -37,7 +37,7 @@ int establish_master_client_fullsize(WindowManager *gwm, Workspace *workspace){
 int establish_monocle_mode(WindowManager *gwm, Workspace *workspace){
     for(int i=0; i<workspace->num_clients; i++){
         move_client(gwm, &workspace->clients[i], gwm->config.clients_gap, gwm->config.clients_gap);
-        resize_client(gwm, &workspace->clients[i], gwm->screen->width_in_pixels - (2 * gwm->config.clients_gap), gwm->screen->height_in_pixels - (2 * gwm->config.clients_gap), 0);
+        resize_client(gwm, &workspace->clients[i], gwm->screen->width_in_pixels - (2 * gwm->config.clients_gap), gwm->screen->height_in_pixels - (2 * gwm->config.clients_gap));
     }
     return 0;
 }
@@ -80,14 +80,14 @@ int establish_stacking_mode(WindowManager *gwm, Workspace *workspace){
         }
 
         move_client(gwm, workspace->layout_clients[0], master_client_x_pos, master_client_y_pos);
-        resize_client(gwm, workspace->layout_clients[0], master_client_width, master_client_height, 0);
+        resize_client(gwm, workspace->layout_clients[0], master_client_width, master_client_height);
 
         if(gwm->config.stacking_mode_master_window_orientation == HORIZONTAL){
             int total_width = (gwm->screen->width_in_pixels - (num_clients * gwm->config.clients_gap)) / (num_clients - 1);
             int current_x = gwm->config.clients_gap;
             for(int i = 1; i < num_clients; i++){
                 move_client(gwm, workspace->layout_clients[i], current_x, slave_client_y_pos);
-                resize_client(gwm, workspace->layout_clients[i], total_width, slave_client_height, 0);
+                resize_client(gwm, workspace->layout_clients[i], total_width, slave_client_height);
                 current_x += total_width + gwm->config.clients_gap;
             }
         } else {
@@ -96,7 +96,7 @@ int establish_stacking_mode(WindowManager *gwm, Workspace *workspace){
             for(int i = 1; i < num_clients; i++){
                 int client_width = workspace->layout_clients[i]->properties.manual_resize ? workspace->layout_clients[i]->properties.width : gwm->screen->width_in_pixels - master_client_width - (3 * gwm->config.clients_gap);
                 move_client(gwm, workspace->layout_clients[i], slave_client_x_pos, current_y);
-                resize_client(gwm, workspace->layout_clients[i], client_width, total_height, 0);
+                resize_client(gwm, workspace->layout_clients[i], client_width, total_height);
                 current_y += total_height + gwm->config.clients_gap;
             }
         }
@@ -117,7 +117,7 @@ int establish_layout(WindowManager *gwm){
     if(workspace->layout_mode == FLOATING_MODE){
         for(int i=0; i<workspace->num_clients; i++){
             move_client(gwm, &workspace->clients[i], workspace->clients[i].properties.floating_x_pos, workspace->clients[i].properties.floating_y_pos);
-            resize_client(gwm, &workspace->clients[i], workspace->clients[i].properties.floating_width, workspace->clients[i].properties.floating_height, 0);
+            resize_client(gwm, &workspace->clients[i], workspace->clients[i].properties.floating_width, workspace->clients[i].properties.floating_height);
         }
         return 0;
     }
@@ -146,7 +146,8 @@ int establish_layout(WindowManager *gwm){
     for(int i=0; i<workspace->num_clients; i++){
         if(workspace->clients[i].properties.is_floating){
             move_client(gwm, &workspace->clients[i], workspace->clients[i].properties.floating_x_pos, workspace->clients[i].properties.floating_y_pos);
-            resize_client(gwm, &workspace->clients[i], workspace->clients[i].properties.floating_width, workspace->clients[i].properties.floating_height, 0);
+            resize_client(gwm, &workspace->clients[i], workspace->clients[i].properties.floating_width, workspace->clients[i].properties.floating_height);
+            raise_client(gwm, &workspace->clients[i]);
         }
     }
 
