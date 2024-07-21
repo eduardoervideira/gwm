@@ -84,6 +84,7 @@ Workspace *create_workspace(WindowManager *gwm, LayoutMode layout_mode){
     workspace->num_clients = 0;
     workspace->available_slots = gwm->config.max_clients;
     workspace->focused_client_id = -1;
+    workspace->last_focused_client_id = -1;
     workspace->layout_mode = layout_mode;
 
     return workspace;
@@ -133,8 +134,8 @@ int add_client_to_workspace(WindowManager *gwm, Workspace *workspace, Client *cl
     workspace->available_slots--;
 
     client->workspace_id = gwm->current_workspace_id;
-    workspace->last_focused_client_id = workspace->focused_client_id;
-    workspace->focused_client_id = workspace->num_clients - 1;
+    //workspace->last_focused_client_id = workspace->focused_client_id;
+    //workspace->focused_client_id = workspace->num_clients - 1;
 
     // TODO: it might not be necessary all these masks -- needs more research
     uint32_t event_mask =   XCB_EVENT_MASK_STRUCTURE_NOTIFY |
@@ -153,14 +154,14 @@ int add_client_to_workspace(WindowManager *gwm, Workspace *workspace, Client *cl
     }
 
     uint32_t button_mask = XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_BUTTON_MOTION;
-    gwm->cookie = xcb_grab_button_checked(gwm->connection, 0, client->window, button_mask, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC, gwm->screen->root, XCB_NONE, 1, XCB_MOD_MASK_1);
+    gwm->cookie = xcb_grab_button_checked(gwm->connection, 0, client->window, button_mask, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC, gwm->screen->root, XCB_NONE, 1, XCB_NONE); // XCB_MOD_MASK_1
     gwm->error = xcb_request_check(gwm->connection, gwm->cookie);
     if(gwm->error){
         log_message(LOG_ERROR, "failed to grab button. error code: %d", gwm->error->error_code);
         free(gwm->error);
     }
     
-    gwm->cookie = xcb_grab_button_checked(gwm->connection, 0, client->window, button_mask, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC, gwm->screen->root, XCB_NONE, 3, XCB_MOD_MASK_1);
+    gwm->cookie = xcb_grab_button_checked(gwm->connection, 0, client->window, button_mask, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC, gwm->screen->root, XCB_NONE, 3, XCB_NONE); 
     gwm->error = xcb_request_check(gwm->connection, gwm->cookie);
     if(gwm->error){
         log_message(LOG_ERROR, "failed to grab button. error code: %d", gwm->error->error_code);

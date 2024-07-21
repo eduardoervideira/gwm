@@ -3,19 +3,25 @@
 
 #include <stdio.h>
 
+#define LOG_FILE "gwm.log"
 #define LOG_INFO "[info]"
 #define LOG_DEBUG "[debug]"
 #define LOG_WARNING "[warning]"
 #define LOG_ERROR "[error]"
 #define LOG_FATAL "[fatal]"
 
+void init_log();
+void close_log();
+void log_message(const char *level, const char *format, ...);
+
+/*
 #define log_message(level, format, ...) \
     do { \
         printf("%s: ", level); \
         printf(format, ##__VA_ARGS__); \
         printf("\n"); \
     } while (0)
-
+*/
 
 #define LAYOUT_MODE_TO_STRING(layout_mode) \
     (layout_mode == FLOATING_MODE) ? "floating" : \
