@@ -13,6 +13,7 @@ int main(int argc, char** argv){
     }
 
     if(!strcmp(argv[1], "start")){
+        init_log();
         WindowManager *gwm = setup();
 
         if(!gwm){
@@ -23,7 +24,7 @@ int main(int argc, char** argv){
         handle_events(gwm);
         cleanup(gwm);
         free(gwm);
-        log_message(LOG_INFO, "gwm terminated");
+        close_log();
     }
 
     return 0;
