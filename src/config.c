@@ -5,6 +5,8 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <sys/inotify.h>
+#include <limits.h>
 #include "config.h"
 #include "utils.h"
 
@@ -230,16 +232,18 @@ int load_configuration(Config *config){
     const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
     const char *home = getenv("HOME");
     char gwm_config_dir_path[512];
-    char gwm_config_file_path[512];
+    //char gwm_config_file_path[512];
+    char *gwm_config_file_path = malloc(512 * sizeof(char));
 
     if(xdg_config_home != NULL){
         snprintf(gwm_config_dir_path, sizeof(gwm_config_dir_path), "%s/gwm", xdg_config_home);
-        snprintf(gwm_config_file_path, sizeof(gwm_config_file_path), "%s/gwm/gwmrc", xdg_config_home);
+        snprintf(gwm_config_file_path, 512, "%s/gwm/gwmrc", xdg_config_home); //snprintf(gwm_config_file_path, sizeof(gwm_config_file_path), "%s/gwm/gwmrc", xdg_config_home);
     } else if(home != NULL){
         snprintf(gwm_config_dir_path, sizeof(gwm_config_dir_path), "%s/.config/gwm", home);
-        snprintf(gwm_config_file_path, sizeof(gwm_config_file_path), "%s/.config/gwm/gwmrc", home);
+        snprintf(gwm_config_file_path, 512, "%s/.config/gwm/gwmrc", home); //snprintf(gwm_config_file_path, sizeof(gwm_config_file_path), "%s/.config/gwm/gwmrc", home);
     } else {
         fprintf(stderr, "failed loading configuration - XDG_CONFIG_HOME or HOME environment variable not defined\n");
+        free(gwm_config_file_path);
         exit(EXIT_FAILURE);
     }
 
@@ -250,6 +254,8 @@ int load_configuration(Config *config){
         fprintf(stderr, "configuration file not found. create a configuration file at %s\n", gwm_config_file_path);
         return -1;
     }
+
+    config->path = gwm_config_file_path;
 
     ConfigMap config_handlers[] = {
         { "workspace_count", handle_uint8, &config->workspace_count },
@@ -268,8 +274,8 @@ int load_configuration(Config *config){
         { "margin_bottom", handle_uint16, &config->margin_bottom },
         { "min_window_width", handle_uint16, &config->min_window_width },
         { "min_window_height", handle_uint16, &config->min_window_height },
-        /*{ "mod1_key", handle_int },
-        { "mod4_key", handle_int },*/
+        //{ "mod1_key", handle_int },
+        //{ "mod4_key", handle_int },
         { "stacking_mode_master_window_ratio", handle_float, &config->stacking_mode_master_window_ratio },
         { "stacking_mode_master_window_position", handle_uint8, &config->stacking_mode_master_window_position },
         { "stacking_mode_master_window_orientation", handle_uint8, &config->stacking_mode_master_window_orientation },
@@ -280,33 +286,10 @@ int load_configuration(Config *config){
     };
 
     parse_config_file(config_handlers, gwm_config_file_path);
-    //set_default_config_for_undefined_values(config); // TODO: rever este codigo
+    time_t rawtime;
+    config->last_change = time(&rawtime);
 
-    printf("workspace_count: %d\n", config->workspace_count);
-    printf("workspace_layouts: ");
-    for(int i = 0; i < config->workspace_count; i++){
-        printf("%d ", config->workspace_layouts[i]);
-    }
-    printf("\n");
-    printf("max_clients: %d\n", config->max_clients);
-    printf("focus_follows_mouse: %d\n", config->focus_follows_mouse);
-    printf("clients_gap: %d\n", config->clients_gap);
-    printf("border_width: %d\n", config->border_width);
-    printf("border_color: %d\n", config->border_color);
-    printf("focused_border_color: %d\n", config->focused_border_color);
-    printf("unfocused_border_color: %d\n", config->unfocused_border_color);
-    printf("margin_left: %d\n", config->margin_left);
-    printf("margin_top: %d\n", config->margin_top);
-    printf("margin_right: %d\n", config->margin_right);
-    printf("margin_bottom: %d\n", config->margin_bottom);
-    printf("min_window_width: %d\n", config->min_window_width);
-    printf("min_window_height: %d\n", config->min_window_height);
-    printf("mod1_key: %d\n", config->mod1_key);
-    printf("mod4_key: %d\n", config->mod4_key);
-    printf("stacking_mode_master_window_ratio: %f\n", config->stacking_mode_master_window_ratio);
-    printf("stacking_mode_master_window_position: %d\n", config->stacking_mode_master_window_position);
-    printf("stacking_mode_master_window_orientation: %d\n", config->stacking_mode_master_window_orientation);
-    printf("n_columns_mode_number_of_columns: %d\n", config->n_columns_mode_number_of_columns);
-    printf("n_rows_mode_number_of_rows: %d\n", config->n_rows_mode_number_of_rows);
+
+    free(gwm_config_file_path);
     return 0;
 }

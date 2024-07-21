@@ -12,8 +12,10 @@
 #include <string.h>
 #include "utils.h"
 #include "config.h"
+#include "client.h"
 #include "workspace.h"
 #include "events.h"
+#include "layout.h"
 #include "structs.h"
 #include "window_manager.h"
 
@@ -22,17 +24,20 @@ WindowManager *setup(){
 
     if(!gwm){
         log_message(LOG_FATAL, "failed to allocate memory for the window manager");
+        cleanup(gwm);
         exit(EXIT_FAILURE);
     }
 
     if(load_configuration(&gwm->config) == -1){
         log_message(LOG_FATAL, "failed to load configuration");
+        cleanup(gwm);
         exit(EXIT_FAILURE);
     }
 
     gwm->connection = xcb_connect(NULL, NULL);
     if(xcb_connection_has_error(gwm->connection)){
         log_message(LOG_ERROR, "failed to connect to the X server");
+        cleanup(gwm);
         exit(EXIT_FAILURE);
     }
 
@@ -116,7 +121,7 @@ WindowManager *setup(){
     // Get the number of CRTCs (physical monitors)
     int num_crtcs = xcb_randr_get_screen_resources_crtcs_length(screen_resources);
     log_message(LOG_DEBUG, "number of physical monitors connected: %d", num_crtcs);
-
+    
     // Clean up and disconnect from X server
     free(screen_resources);
 
@@ -133,34 +138,22 @@ WindowManager *setup(){
     // TODO: implement configurable and flexible keybindings
     // MOD1 + Q
     xcb_keycode_t *keycode_q = xcb_key_symbols_get_keycode(gwm->key_symbols, XK_Q);
-    xcb_grab_key(gwm->connection, 1, gwm->screen->root, XCB_MOD_MASK_1, *keycode_q,
-        XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
+    xcb_grab_key(gwm->connection, 1, gwm->screen->root, XCB_MOD_MASK_1, *keycode_q, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
 
     // MOD1 + Tab - cycle through workspaces
     xcb_keycode_t *keycode_tab = xcb_key_symbols_get_keycode(gwm->key_symbols, XK_Tab);
-    xcb_grab_key(gwm->connection, 1, gwm->screen->root, XCB_MOD_MASK_1, *keycode_tab,
-        XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
+    xcb_grab_key(gwm->connection, 1, gwm->screen->root, XCB_MOD_MASK_1, *keycode_tab, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
 
     // MOD1 + L - reset workspace layouts
     xcb_keycode_t *keycode_l = xcb_key_symbols_get_keycode(gwm->key_symbols, XK_L);
-    xcb_grab_key(gwm->connection, 1, gwm->screen->root, XCB_MOD_MASK_1, *keycode_l,
-        XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
+    xcb_grab_key(gwm->connection, 1, gwm->screen->root, XCB_MOD_MASK_1, *keycode_l, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
 
     free(keycode_q);
     free(keycode_l);
     free(keycode_tab);
 
-    /*xcb_grab_button(gwm->connection, 0, gwm->screen->root, XCB_EVENT_MASK_BUTTON_PRESS |
-        XCB_EVENT_MASK_BUTTON_RELEASE, XCB_GRAB_MODE_ASYNC,
-        XCB_GRAB_MODE_ASYNC, gwm->screen->root, XCB_NONE, 1, XCB_MOD_MASK_1); // XCB_NONE to allow mouse events without Mod1 pressed
-
-    xcb_grab_button(gwm->connection, 0, gwm->screen->root, XCB_EVENT_MASK_BUTTON_PRESS |
-        XCB_EVENT_MASK_BUTTON_RELEASE, XCB_GRAB_MODE_ASYNC,
-        XCB_GRAB_MODE_ASYNC, gwm->screen->root, XCB_NONE, 3, XCB_MOD_MASK_1);*/
-
     xcb_flush(gwm->connection);
 
-    // Create workspaces
     gwm->workspaces = (Workspace *)calloc(gwm->config.workspace_count, sizeof(Workspace));
     if(!gwm->workspaces){
         log_message(LOG_ERROR, "failed to allocate memory for workspaces");
@@ -180,6 +173,7 @@ WindowManager *setup(){
     }
 
     log_message(LOG_INFO, "gwm running");
+    log_message(LOG_INFO, "gwm window id: %d", gwm->wm_window);
     log_message(LOG_DEBUG, "number of workspaces: %d", gwm->num_workspaces);
     log_message(LOG_DEBUG, "current workspace id: %d", gwm->current_workspace_id);
     log_message(LOG_DEBUG, "screen width: %d", gwm->screen->width_in_pixels);
@@ -192,7 +186,56 @@ WindowManager *setup(){
     }
 
     // TODO: handle rules -- not implemented yet
-    // TODO: handle previous opened windows before gwm launching -- not implemented yet
+    // TODO: handle previous opened windows before gwm launching -- partially implemented
+    xcb_query_tree_cookie_t tree_cookie = xcb_query_tree(gwm->connection, gwm->screen->root);
+    xcb_query_tree_reply_t *tree_reply = xcb_query_tree_reply(gwm->connection, tree_cookie, NULL);
+    if (!tree_reply) {
+        fprintf(stderr, "error getting the tree reply\n");
+        xcb_disconnect(gwm->connection);
+        exit(EXIT_FAILURE);
+    }
+
+    xcb_window_t *children = xcb_query_tree_children(tree_reply);
+    int num_children = xcb_query_tree_children_length(tree_reply);
+
+    for (int i = 0; i < num_children; i++) {
+        xcb_window_t window = children[i];
+        if(window == gwm->wm_window)
+            continue;
+
+        xcb_get_window_attributes_cookie_t window_attributes_cookie = xcb_get_window_attributes(gwm->connection, window);
+        xcb_get_window_attributes_reply_t *window_attributes_reply = xcb_get_window_attributes_reply(gwm->connection, window_attributes_cookie, NULL);
+        if(window_attributes_reply->override_redirect){
+            free(window_attributes_reply);
+            continue;
+        }
+
+        // TODO: handle window types (desktop, dock, toolbar, etc)
+
+        if(get_client(gwm, window) != NULL){
+            free(window_attributes_reply);
+            continue;
+        }
+
+        free(window_attributes_reply);
+
+        Client *client = create_client();
+        if(client == NULL){
+            fprintf(stderr, "failed to create client\n");
+            exit(EXIT_FAILURE); // TODO: revise this exit() call
+        }
+
+        client->window = window;
+        add_client_to_workspace(gwm, &gwm->workspaces[gwm->current_workspace_id], client);
+
+        establish_layout(gwm);
+        xcb_flush(gwm->connection);
+        free(client);
+    }
+    
+    free(tree_reply);
+
+    // TODO: create cursor for root window -- not implemented yet
     return gwm;
 }
 
@@ -217,4 +260,5 @@ void cleanup(WindowManager *gwm){
     xcb_key_symbols_free(gwm->key_symbols);
     xcb_ewmh_connection_wipe(&gwm->ewmh);
     xcb_disconnect(gwm->connection);
+    log_message(LOG_INFO, "gwm terminated");
 }
