@@ -29,12 +29,6 @@ int handle_configure_notify(WindowManager *gwm, xcb_generic_event_t *event){
     return 0;
 }*/
 
-void adjust_dimensions(WindowManager *gwm, Client *client, uint16_t client_x_pos, uint16_t client_y_pos, uint16_t *width, uint16_t *height, uint16_t width_change, uint16_t height_change, uint16_t move_x, uint16_t move_y) {
-    *width += width_change;
-    *height += height_change;
-    move_client(gwm, client, client_x_pos + move_x, client_y_pos + move_y);
-}
-
 int handle_motion_notify(WindowManager *gwm, xcb_generic_event_t *event){
     xcb_motion_notify_event_t *motion_notify_event = (xcb_motion_notify_event_t *)event;
 
@@ -42,81 +36,72 @@ int handle_motion_notify(WindowManager *gwm, xcb_generic_event_t *event){
     if(client == NULL)
         return -1;
 
+    /*if(motion_notify_event->event_x >= 0 && motion_notify_event->event_x <= 5 || motion_notify_event->event_x >= client->properties.width - 5 && motion_notify_event->event_x <= client->properties.width){ // left border
+        setCursor(gwm->connection, gwm->screen, gwm->screen->root, 108);
+    } else if(motion_notify_event->event_y >= 0 && motion_notify_event->event_y <= 5 || motion_notify_event->event_y >= client->properties.height - 5 && motion_notify_event->event_y <= client->properties.height){ // upper border
+        setCursor(gwm->connection, gwm->screen, gwm->screen->root, 116);
+    }*/
+
     if(motion_notify_event->state & XCB_BUTTON_MASK_1 && client->properties.is_floating){
-        uint16_t dragdelta_x = motion_notify_event->root_x - gwm->cursor_x;
-        uint16_t dragdelta_y = motion_notify_event->root_y - gwm->cursor_y;
-        move_client(gwm, client, client->properties.x_pos + dragdelta_x, client->properties.y_pos + dragdelta_y);
-    } else if(motion_notify_event->state & XCB_BUTTON_MASK_3 && client->properties.is_floating){
-        uint16_t new_width = client->properties.width;
-        uint16_t new_height = client->properties.height;
+        int16_t dragdelta_x = motion_notify_event->root_x - gwm->cursor_x;
+        int16_t dragdelta_y = motion_notify_event->root_y - gwm->cursor_y;
+        move_client(gwm, client, client->properties.floating_x_pos + dragdelta_x, client->properties.floating_y_pos + dragdelta_y);
+    } else if (motion_notify_event->state & XCB_BUTTON_MASK_3 && client->properties.is_floating) {
+        int16_t resize_delta_x = motion_notify_event->root_x - gwm->cursor_x;
+        int16_t resize_delta_y = motion_notify_event->root_y - gwm->cursor_y;
 
-        bool top_left = (motion_notify_event->root_x >= client->properties.x_pos - 65) && 
-                        (motion_notify_event->root_x <= client->properties.x_pos + 65) && 
-                        (motion_notify_event->root_y >= client->properties.y_pos - 65) && 
-                        (motion_notify_event->root_y <= client->properties.y_pos + 65);
+        bool resize_horizontal = false;
+        bool resize_vertical = false;
+        bool move_horizontal = false;
+        bool move_vertical = false;
 
-        bool top_right = (motion_notify_event->root_x >= client->properties.x_pos + client->properties.width - 65) && 
-                        (motion_notify_event->root_x <= client->properties.x_pos + client->properties.width + 65) && 
-                        (motion_notify_event->root_y >= client->properties.y_pos - 65) && 
-                        (motion_notify_event->root_y <= client->properties.y_pos + 65);
-
-        bool bottom_right = (motion_notify_event->root_x >= client->properties.x_pos + client->properties.width - 65) && 
-                        (motion_notify_event->root_x <= client->properties.x_pos + client->properties.width + 65) && 
-                        (motion_notify_event->root_y >= client->properties.y_pos + client->properties.height - 65) && 
-                        (motion_notify_event->root_y <= client->properties.y_pos + client->properties.height + 65);
-
-        bool bottom_left = (motion_notify_event->root_x >= client->properties.x_pos - 65) && 
-                        (motion_notify_event->root_x <= client->properties.x_pos + 65) && 
-                        (motion_notify_event->root_y >= client->properties.y_pos + client->properties.height - 65) && 
-                        (motion_notify_event->root_y <= client->properties.y_pos + client->properties.height + 65);
-
-        if (top_left) {
-            if (motion_notify_event->event_x < 0 && motion_notify_event->event_y < 0) {
-                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, abs(motion_notify_event->event_x), abs(motion_notify_event->event_y), motion_notify_event->event_x, motion_notify_event->event_y);
-            } else if (motion_notify_event->event_x > 0 && motion_notify_event->event_y > 0) {
-                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, -abs(motion_notify_event->event_x), -abs(motion_notify_event->event_y), motion_notify_event->event_x, motion_notify_event->event_y);
-            }
-        } else if (top_right) {
-            if (motion_notify_event->event_x > 0 && motion_notify_event->event_y < 0) {
-                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, motion_notify_event->event_x - new_width, abs(motion_notify_event->event_y), 0, motion_notify_event->event_y);
-            } else if (motion_notify_event->event_x > 0 && motion_notify_event->event_y > 0) {
-                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, motion_notify_event->event_x - new_width, -abs(motion_notify_event->event_y), 0, motion_notify_event->event_y);
-            }
-        } else if (bottom_left) {
-            if (motion_notify_event->event_x < 0 && motion_notify_event->event_y > 0) {
-                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, abs(motion_notify_event->event_x), motion_notify_event->event_y - new_height, motion_notify_event->event_x, 0);
-            } else if (motion_notify_event->event_x > 0 && motion_notify_event->event_y > 0) {
-                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, -abs(motion_notify_event->event_x), motion_notify_event->event_y - new_height, motion_notify_event->event_x, 0);
-            }
-        } else if (bottom_right) {
-            if (motion_notify_event->event_x > 0 && motion_notify_event->event_y > 0) {
-                new_width = motion_notify_event->event_x;
-                new_height = motion_notify_event->event_y;
-            } else if (motion_notify_event->event_x < 0 && motion_notify_event->event_y > 0) {
-                adjust_dimensions(gwm, client, client->properties.x_pos, client->properties.y_pos, &new_width, &new_height, abs(motion_notify_event->event_x), motion_notify_event->event_y - new_height, 0, 0);
-            }
+        if (gwm->cursor_x >= client->properties.x_pos - CORNER_MARGIN && gwm->cursor_x <= client->properties.x_pos + CORNER_MARGIN) {
+            // Left edge or top-left/bottom-left corner
+            resize_horizontal = true;
+            move_horizontal = true;
+        } else if (gwm->cursor_x >= client->properties.x_pos + client->properties.width - CORNER_MARGIN && gwm->cursor_x <= client->properties.x_pos + client->properties.width + CORNER_MARGIN) {
+            // Right edge or top-right/bottom-right corner
+            resize_horizontal = true;
         }
 
-        if(!top_left && !top_right && !bottom_left && !bottom_right){
-             // TODO: resize growing working but shrinking is not -- it's a little bit buggy
-            if(motion_notify_event->root_y > client->properties.y_pos + client->properties.height) {
-                new_height = motion_notify_event->root_y - client->properties.y_pos;
-            } else if(motion_notify_event->event_y < 0) {
-                new_height = client->properties.height + abs(motion_notify_event->event_y);
-                move_client(gwm, client, client->properties.x_pos, client->properties.y_pos - abs(motion_notify_event->event_y));
-            } else if(motion_notify_event->event_x < 0){
-                new_width = client->properties.width + abs(motion_notify_event->event_x);
-                move_client(gwm, client, client->properties.x_pos - abs(motion_notify_event->event_x), client->properties.y_pos);
-            } else if(motion_notify_event->root_x > client->properties.x_pos + client->properties.width) {
-                new_width = motion_notify_event->root_x - client->properties.x_pos;
-            }
+        if (gwm->cursor_y >= client->properties.y_pos - CORNER_MARGIN && gwm->cursor_y <= client->properties.y_pos + CORNER_MARGIN) {
+            // Top edge or top-left/top-right corner
+            resize_vertical = true;
+            move_vertical = true;
+        } else if (gwm->cursor_y >= client->properties.y_pos + client->properties.height - CORNER_MARGIN && gwm->cursor_y <= client->properties.y_pos + client->properties.height + CORNER_MARGIN) {
+            // Bottom edge or bottom-left/bottom-right corner
+            resize_vertical = true;
         }
 
-        if (new_width < 150) new_width = 150;
-        if (new_height < 150) new_height = 150;
+        if (resize_horizontal || resize_vertical) {
+            int new_width = client->properties.width;
+            int new_height = client->properties.height;
+            int new_x_pos = client->properties.floating_x_pos;
+            int new_y_pos = client->properties.floating_y_pos;
 
-        resize_client(gwm, client, new_width, new_height, true);
+            if (resize_horizontal) {
+                new_width = client->properties.width + (move_horizontal ? -resize_delta_x : resize_delta_x);
+                if (move_horizontal) new_x_pos += resize_delta_x;
+            }
+
+            if (resize_vertical) {
+                new_height = client->properties.height + (move_vertical ? -resize_delta_y : resize_delta_y);
+                if (move_vertical) new_y_pos += resize_delta_y;
+            }
+
+            if(new_width < 300) new_width = 300;
+            if(new_height < 150) new_height = 150;
+
+            if (move_horizontal || move_vertical) {
+                move_client(gwm, client, new_x_pos, new_y_pos);
+            }
+
+            resize_client(gwm, client, new_width, new_height);
+        }
     }
+
+    gwm->cursor_x = motion_notify_event->root_x;
+    gwm->cursor_y = motion_notify_event->root_y;
     return 0;
 }
 
@@ -127,10 +112,9 @@ int handle_enter_notify(WindowManager *gwm, xcb_generic_event_t *event){
     if(client_index == -1)
         return -1;
 
+    Client *client = &gwm->workspaces[gwm->current_workspace_id].clients[client_index];
     if(gwm->config.focus_follows_mouse){
-        xcb_set_input_focus(gwm->connection, XCB_INPUT_FOCUS_POINTER_ROOT, enter_notify_event->event, XCB_CURRENT_TIME);
-        xcb_ewmh_set_active_window(&gwm->ewmh, 0, enter_notify_event->event);
-        gwm->workspaces[gwm->current_workspace_id].focused_client_id = client_index;
+        set_client_focus(gwm, client, client_index);
     }
 
     xcb_flush(gwm->connection);
@@ -144,37 +128,15 @@ int handle_button_press(WindowManager *gwm, xcb_generic_event_t *event){
     if(client == NULL)
         return -1;
 
-    if(button_press_event->detail == 1){
+    if(button_press_event->detail == 1 || button_press_event->detail == 3){
         gwm->button_pressed = true;
         gwm->cursor_x = button_press_event->root_x;
         gwm->cursor_y = button_press_event->root_y;
 
-        /*if(client->properties.is_floating){
-            gwm->client_x = client->properties.floating_x_pos;
-            gwm->client_y = client->properties.floating_y_pos;
-        } else {
-            gwm->client_x = client->properties.x_pos;
-            gwm->client_y = client->properties.y_pos;
-        }*/
+        if(client->properties.is_floating)
+            raise_client(gwm, client);
 
-        xcb_set_input_focus(gwm->connection, XCB_INPUT_FOCUS_POINTER_ROOT, client->window, XCB_CURRENT_TIME);
-        xcb_ewmh_set_active_window(&gwm->ewmh, 0, client->window);
-        raise_client(gwm, client);
-        //xcb_configure_window(gwm->connection, client->window, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_ABOVE});
-        //xcb_ewmh_set_wm_state(&gwm->ewmh, client->window, 1, &gwm->ewmh._NET_WM_STATE_ABOVE);
-    } else if(button_press_event->detail == 3){
-        log_message(LOG_DEBUG, "Button 3 pressed");
-        gwm->button_pressed = true;
-        gwm->cursor_x = button_press_event->event_x;
-        gwm->cursor_y = button_press_event->event_y;
-
-        /*printf("Client X: %d, Y: %d\n", client->properties.x_pos, client->properties.y_pos);
-        printf("Client Width: %d, Height: %d\n", client->properties.width, client->properties.height);
-        printf("Cursor X: %d, Y: %d\n", button_press_event->root_x, button_press_event->root_y);
-        printf("root_x %d, root_y %d\n", button_press_event->root_x, button_press_event->root_y);
-        printf("event_x %d, event_y %d\n", button_press_event->event_x, button_press_event->event_y);
-        printf("client X %d, Y %d\n", client->properties.x_pos, client->properties.y_pos);
-        printf("client width %d, height %d\n", client->properties.width, client->properties.height);*/
+        set_client_focus(gwm, client, get_client_index(gwm, button_press_event->event));
     }
 
     xcb_flush(gwm->connection);
@@ -217,10 +179,10 @@ int handle_destroy_notify(WindowManager *gwm, xcb_generic_event_t *event){
         return -1;
 
     remove_client_from_workspace(&gwm->workspaces[gwm->current_workspace_id], client);
-    if(gwm->workspaces[gwm->current_workspace_id].focused_client_id != -1){
+    /*if(gwm->workspaces[gwm->current_workspace_id].focused_client_id != -1){
         xcb_ewmh_set_active_window(&gwm->ewmh, 0, gwm->workspaces[gwm->current_workspace_id].clients[gwm->workspaces[gwm->current_workspace_id].focused_client_id].window);
         xcb_set_input_focus(gwm->connection, XCB_INPUT_FOCUS_POINTER_ROOT, gwm->workspaces[gwm->current_workspace_id].clients[gwm->workspaces[gwm->current_workspace_id].focused_client_id].window, XCB_CURRENT_TIME);
-    }
+    }*/
 
     establish_layout(gwm);
     xcb_flush(gwm->connection);
@@ -257,6 +219,8 @@ void handle_mod1_key_press(WindowManager *gwm, xcb_key_press_event_t *key_event)
     } else if(is_key_pressed(gwm->key_symbols, key_event->detail, (xcb_keycode_t)XK_Tab)){
         cycle_through_workspaces(gwm);
     }
+
+
 }
 
 // KeyPress with MOD4 + Shift
@@ -267,13 +231,47 @@ void handle_mod4_shift_key_press(WindowManager *gwm, xcb_key_press_event_t *key_
         // Mod4 + Shift + Down
     } else if(is_key_pressed(gwm->key_symbols, key_event->detail, (xcb_keycode_t)XK_Left)){
         // TODO: set decrement to config property
-        resize_client(gwm, client, client->properties.width - 15, client->properties.height, true);
+        resize_client(gwm, client, client->properties.width - 15, client->properties.height);
         establish_layout(gwm);
     } else if(is_key_pressed(gwm->key_symbols, key_event->detail, (xcb_keycode_t)XK_Right)){
         // TODO: fix bug - if there are 3 clients (1 master and 2 other), if master is resized the others stay out of the screen
-        resize_client(gwm, client, client->properties.width + 15, client->properties.height, true);
+        resize_client(gwm, client, client->properties.width + 15, client->properties.height);
         establish_layout(gwm);
     }
+}
+
+void kill_client(WindowManager *gwm, xcb_window_t window) {
+    xcb_intern_atom_cookie_t wm_protocols_cookie, wm_delete_window_cookie;
+    xcb_intern_atom_reply_t *wm_protocols_reply, *wm_delete_window_reply;
+    xcb_client_message_event_t ev;
+
+    wm_protocols_cookie = xcb_intern_atom(gwm->connection, 1, strlen("WM_PROTOCOLS"), "WM_PROTOCOLS");
+    wm_protocols_reply = xcb_intern_atom_reply(gwm->connection, wm_protocols_cookie, NULL);
+    if (!wm_protocols_reply) {
+        fprintf(stderr, "Falha ao obter WM_PROTOCOLS atom\n");
+        return;
+    }
+
+    wm_delete_window_cookie = xcb_intern_atom(gwm->connection, 0, strlen("WM_DELETE_WINDOW"), "WM_DELETE_WINDOW");
+    wm_delete_window_reply = xcb_intern_atom_reply(gwm->connection, wm_delete_window_cookie, NULL);
+    if (!wm_delete_window_reply) {
+        fprintf(stderr, "Falha ao obter WM_DELETE_WINDOW atom\n");
+        free(wm_protocols_reply);
+        return;
+    }
+
+    ev.response_type = XCB_CLIENT_MESSAGE;
+    ev.window = window;
+    ev.type = wm_protocols_reply->atom;
+    ev.format = 32;
+    ev.data.data32[0] = wm_delete_window_reply->atom;
+    ev.data.data32[1] = XCB_CURRENT_TIME;
+
+    xcb_send_event(gwm->connection, 0, window, XCB_EVENT_MASK_NO_EVENT, (const char *)&ev);
+    xcb_flush(gwm->connection);
+
+    free(wm_protocols_reply);
+    free(wm_delete_window_reply);
 }
 
 // KeyPress with MOD4 (Super)
@@ -285,7 +283,7 @@ void handle_mod4_key_press(WindowManager *gwm, xcb_key_press_event_t *key_event)
     Client *client = &gwm->workspaces[gwm->current_workspace_id].clients[client_index];
     
     if(is_key_pressed(gwm->key_symbols, key_event->detail, XK_C)){ // kill client
-        xcb_kill_client(gwm->connection, client->window); // TODO: needs to be implemented in a better way, xcb_kill_client might be too abruptly
+        kill_client(gwm, client->window); // xcb_client_kill was the previous function
     } else if(is_key_pressed(gwm->key_symbols, key_event->detail, XK_F)){ // toggle floating
         log_message(LOG_DEBUG, "toggled floating");
         toggle_floating(gwm, client, !client->properties.is_floating);
@@ -326,7 +324,30 @@ int handle_map_request(WindowManager *gwm, xcb_generic_event_t *event){
         free(window_attributes_reply);
         return -1;
     }
-    
+
+    /*bool ignore_window = false;
+    xcb_ewmh_get_atoms_reply_t win_type;
+    if (xcb_ewmh_get_wm_window_type_reply(&gwm->ewmh, xcb_ewmh_get_wm_window_type(&gwm->ewmh, map_request_event->window), &win_type, NULL) == 1) {
+        for (unsigned int i = 0; i < win_type.atoms_len; i++) {
+            xcb_atom_t a = win_type.atoms[i];
+            if (a == gwm->ewmh._NET_WM_WINDOW_TYPE_DESKTOP || a == gwm->ewmh._NET_WM_WINDOW_TYPE_DOCK || a == gwm->ewmh._NET_WM_WINDOW_TYPE_TOOLBAR || a == gwm->ewmh._NET_WM_WINDOW_TYPE_MENU || a == gwm->ewmh._NET_WM_WINDOW_TYPE_SPLASH || a == gwm->ewmh._NET_WM_WINDOW_TYPE_UTILITY) {
+                ignore_window = true;
+                break;
+            }
+        }
+        xcb_ewmh_get_atoms_reply_wipe(&win_type);
+    } else {
+        log_message(LOG_WARNING, "failed to get _NET_WM_WINDOW_TYPE property of window: %d", map_request_event->window);
+        //ignore_window = true;
+    }
+
+    if(ignore_window){
+        free(window_attributes_reply);
+        xcb_map_window(gwm->connection, map_request_event->window);
+        xcb_flush(gwm->connection);
+        return -1;
+    }*/
+
     if(get_client(gwm, map_request_event->window) != NULL){
         free(window_attributes_reply);
         return -1;
@@ -342,30 +363,12 @@ int handle_map_request(WindowManager *gwm, xcb_generic_event_t *event){
 
     client->window = map_request_event->window;
     add_client_to_workspace(gwm, &gwm->workspaces[gwm->current_workspace_id], client);
-
-    /*printf("Client window: %d\n", client->window);
-    printf("Client workspace_id: %d\n", client->workspace_id);
-    printf("Client x_pos: %d\n", client->properties.x_pos);
-    printf("Client y_pos: %d\n", client->properties.y_pos);
-    printf("Client floating_x_pos: %d\n", client->properties.floating_x_pos);
-    printf("Client floating_y_pos: %d\n", client->properties.floating_y_pos);
-    printf("Client width: %d\n", client->properties.width);
-    printf("Client height: %d\n", client->properties.height);
-    printf("Client floating_width: %d\n", client->properties.floating_width);
-    printf("Client floating_height: %d\n", client->properties.floating_height);
-    printf("Client is_floating: %d\n", client->properties.is_floating);*/
+    set_client_border_width(gwm, client, 1);
 
     //apply_client_rules(gwm, client);
     establish_layout(gwm); // TODO: check error code before
-
-    set_client_border_width(gwm, client, 1);
-    set_client_border_color(gwm, client, 0xb6f474);
-    
     xcb_map_window(gwm->connection, client->window);
-    
-    xcb_set_input_focus(gwm->connection, XCB_INPUT_FOCUS_POINTER_ROOT, client->window, XCB_CURRENT_TIME);
-    xcb_ewmh_set_active_window(&gwm->ewmh, 0, client->window);
-
+    set_client_focus(gwm, client, gwm->workspaces[gwm->current_workspace_id].num_clients - 1);
     xcb_flush(gwm->connection);
     free(client);
     return 0;
@@ -390,26 +393,16 @@ void sigint_handler(){
 int handle_events(WindowManager *gwm){
     xcb_generic_event_t *event;
     signal(SIGINT, sigint_handler);
+
     while(run){
         if((event = xcb_wait_for_event(gwm->connection)) != NULL){
             //printf("Received event: %d\n", event->response_type & ~0x80);
             switch(event->response_type & ~0x80){
-                case XCB_BUTTON_RELEASE:
-                    gwm->button_pressed = false;
-                    break;
                 case XCB_BUTTON_PRESS:
                     handle_button_press(gwm, event);
                     break;
-                case XCB_FOCUS_IN:
-                    // TODO: set workspace->focused_client_id the index of this client's event
-                    //printf("focus in - response_type: %d, detail: %d, sequence: %d, event: %d, mode: %d\n", event->response_type, ((xcb_focus_in_event_t *)event)->detail, ((xcb_focus_in_event_t *)event)->sequence, ((xcb_focus_in_event_t *)event)->event, ((xcb_focus_in_event_t *)event)->mode);
-                    break;
-                case XCB_FOCUS_OUT:
-                    // TODO: set workspace->last_focused_client_id the index of this client's event
-                    //printf("focus out - response_type: %d, detail: %d, sequence: %d, event: %d, mode: %d\n", event->response_type, ((xcb_focus_in_event_t *)event)->detail, ((xcb_focus_in_event_t *)event)->sequence, ((xcb_focus_in_event_t *)event)->event, ((xcb_focus_in_event_t *)event)->mode);
-                    break;
                 case XCB_ENTER_NOTIFY:
-                    //handle_enter_notify(gwm, event);
+                    handle_enter_notify(gwm, event);
                     break;
                 case XCB_CONFIGURE_REQUEST:
                     handle_configure_request(gwm, event);
