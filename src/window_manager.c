@@ -232,6 +232,28 @@ WindowManager *setup(){
     // Clean up and disconnect from X server
     free(screen_resources);
 
+    // TODO: create workspaces in a flexible way
+    gwm->num_workspaces = 2;
+    gwm->max_clients = 10;
+
+    gwm->workspaces = (Workspace *)calloc(gwm->num_workspaces, sizeof(Workspace));
+    if(!gwm->workspaces){
+        printf("[error]: failed to allocate memory for workspaces\n");
+        xcb_disconnect(gwm->connection);
+        exit(EXIT_FAILURE);
+    }
+
+    for(int i = 0; i < gwm->num_workspaces; i++){
+        Workspace *workspace = create_workspace(gwm, i == 0 ? STACKING_MODE : FLOATING_MODE);
+        if(!workspace){
+            printf("[fatal]: failed to create workspace\n");
+            exit(EXIT_FAILURE);
+        }
+
+        gwm->workspaces[i] = *workspace;
+        free(workspace);
+    }
+
     // Ungrab all keys
     xcb_ungrab_key(gwm->connection, XCB_GRAB_ANY, gwm->screen->root, XCB_MOD_MASK_ANY);
 
@@ -262,8 +284,6 @@ WindowManager *setup(){
     }
     
     xcb_flush(gwm->connection);
-
-    // TODO: create workspaces
 
     printf("[info]: gwm running\n");
     printf("[info]: gwm window id: %d\n", gwm->wm_window);
